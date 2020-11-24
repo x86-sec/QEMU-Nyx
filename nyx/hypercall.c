@@ -481,7 +481,11 @@ static void handle_hypercall_kafl_submit_panic(struct kvm_run *run, CPUState *cp
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "Panic address:\t%lx", hypercall_arg);
 		if(notifiers_enabled){
-			write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD, PAYLOAD_BUFFER_SIZE, cpu);
+			if (run->hypercall.longmode) {
+				write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_64, PAYLOAD_BUFFER_SIZE, cpu);
+			} else {
+				write_virtual_memory(hypercall_arg, (uint8_t*)PANIC_PAYLOAD_32, PAYLOAD_BUFFER_SIZE, cpu);
+			}
 		}
 	}
 }
@@ -490,7 +494,11 @@ static void handle_hypercall_kafl_submit_kasan(struct kvm_run *run, CPUState *cp
 	if(hypercall_enabled){
 		QEMU_PT_PRINTF(CORE_PREFIX, "kASAN address:\t%lx", hypercall_arg);
 		if(notifiers_enabled){
-			write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD, PAYLOAD_BUFFER_SIZE, cpu);
+			if (run->hypercall.longmode){
+				write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_64, PAYLOAD_BUFFER_SIZE, cpu);
+			} else {
+				write_virtual_memory(hypercall_arg, (uint8_t*)KASAN_PAYLOAD_32, PAYLOAD_BUFFER_SIZE, cpu);
+			}
 		}
 	}
 }
