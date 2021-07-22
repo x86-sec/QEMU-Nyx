@@ -34,9 +34,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/memory_access.h"
 #include "nyx/interface.h"
 #include "nyx/debug.h"
+#include "nyx/file_helper.h"
+#ifdef CONFIG_REDQUEEN
 #include "nyx/redqueen.h"
 #include "nyx/redqueen_patch.h"
 #include "nyx/patcher.h"
+#endif
 #include "nyx/page_cache.h"
 #include "nyx/state.h"
 #include <libxdc.h>
@@ -44,16 +47,11 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 #define PT_BUFFER_MMAP_ADDR 0x3ffff0000000
 
-/*
-extern uint32_t kafl_bitmap_size;
-uint8_t* bitmap = NULL;
-*/
-
-uint32_t state_byte = 0;
-uint32_t last = 0;
+uint32_t alt_bitmap_size = 0;
+uint8_t* alt_bitmap = NULL;
 
 int pt_trace_dump_fd = 0;
-bool should_dump_pt_trace= false;
+bool should_dump_pt_trace= false; /* dump PT trace as returned from HW */
 
 void pt_open_pt_trace_file(char* filename){
   printf("using pt trace at %s",filename);
@@ -72,7 +70,7 @@ void pt_trucate_pt_trace_file(void){
 void pt_sync(void){
 	/*
 	if(bitmap){
-		msync(bitmap, kafl_bitmap_size, MS_SYNC);
+		msync(bitmap, alt_bitmap_size, MS_SYNC);
 	}
 	*/
 }
@@ -111,19 +109,18 @@ static inline int pt_ioctl(int fd, unsigned long request, unsigned long arg){
 	return ioctl(fd, request, arg);
 }
 
-/*
-void pt_setup_bitmap(void* ptr){
-	bitmap = (uint8_t*)ptr;
+void alt_bitmap_init(void* ptr, uint32_t size)
+{
+	alt_bitmap = (uint8_t*)ptr;
+	alt_bitmap_size = size;
 }
 
-void pt_reset_bitmap(void){
-	if(bitmap){
-		state_byte = 0;
-		last = 0;
-		memset(bitmap, 0x00, kafl_bitmap_size);
+void alt_bitmap_reset(void)
+{
+	if(alt_bitmap) {
+		memset(alt_bitmap, 0x00, alt_bitmap_size);
 	}
 }
-*/
 
 static inline uint64_t mix_bits(uint64_t v) {
   v ^= (v >> 31);
@@ -137,32 +134,20 @@ static inline uint64_t mix_bits(uint64_t v) {
 }
 
 /*
-void pt_bitmap(uint64_t from, uint64_t to){
+ * quick+dirty bitmap based on libxdc trace callback
+ * similar but not itentical to libxdc bitmap.
+ */
+void alt_bitmap_add(uint64_t from, uint64_t to)
+{
+	uint64_t transition_value;
 
-	//if(to == 0x400965 || (last == 0x400965 && to == 0x40087A)){
-	//	last = to;
-	//	state_byte = mix_bits(state_byte)^to;
-	//	bitmap[state_byte & (kafl_bitmap_size-1)]++; 
-	//}
-
-	//printf("from: %lx\tto: %lx\n", from, to);
-
-	uint32_t transition_value = 0;
-	#ifdef SAMPLE_DECODED
-	sample_decoded(from,to);
-	#endif
-	if(bitmap){		
-		transition_value = mix_bits(to)^(mix_bits(from)>>1);
-		//
-		//if ((from == 0x7ffff7884e8f && to == 0x7ffff7884eff) || (from == 0x7ffff7884f10 && to == 0x7ffff7884f12) || (from == 0x7ffff7884f14 && to == 0x7ffff7884e80)){
-		//	return;
-		//}
-		//fprintf(stderr, "%lx %lx %x\n", from, to, check_bitmap_byte(transition_value & (kafl_bitmap_size-1)));
-		if (check_bitmap_byte(transition_value & (kafl_bitmap_size-1)) == 0)
-			bitmap[transition_value & (kafl_bitmap_size-1)]++;
+	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
+		if(alt_bitmap) {
+			transition_value = mix_bits(to)^(mix_bits(from)>>1);
+			alt_bitmap[transition_value & (alt_bitmap_size-1)]++;
+		}
 	}
 }
-*/
 
 #ifdef DUMP_AND_DEBUG_PT
 void dump_pt_trace(void* buffer, int bytes){
@@ -225,8 +210,11 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 	if(!fast_reload_set_bitmap(get_fast_reload_snapshot())){
 		fuzz_bitmap_reset();
 	}
-	//pt_reset_bitmap();
-  pt_trucate_pt_trace_file();
+	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
+		delete_trace_files();
+		alt_bitmap_reset();
+	}
+	pt_trucate_pt_trace_file();
 	return pt_cmd(cpu, KVM_VMX_PT_ENABLE, hmp_mode);
 }
 	
@@ -308,6 +296,10 @@ void pt_init_decoder(CPUState *cpu){
 	GET_GLOBAL_STATE()->decoder = libxdc_init(filters, (void* (*)(void*, uint64_t, bool*))page_cache_fetch2, GET_GLOBAL_STATE()->page_cache, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size);
 
 	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
+	
+	alt_bitmap_init(
+			GET_GLOBAL_STATE()->shared_bitmap_ptr,
+			GET_GLOBAL_STATE()->shared_bitmap_size);
 }
 
 int pt_disable_ip_filtering(CPUState *cpu, uint8_t addrn, bool hmp_mode){

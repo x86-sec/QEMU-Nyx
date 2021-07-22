@@ -62,8 +62,6 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define KAFLMEM(obj) \
 		OBJECT_CHECK(nyx_interface_state, (obj), TYPE_KAFLMEM)
 
-uint32_t kafl_bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
-
 static void pci_kafl_guest_realize(DeviceState *dev, Error **errp);
 
 typedef struct nyx_interface_state {
