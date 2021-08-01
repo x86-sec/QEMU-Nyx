@@ -370,8 +370,9 @@ static void pci_kafl_guest_realize(DeviceState *dev, Error **errp){
 		s->bitmap_size = DEFAULT_KAFL_BITMAP_SIZE;
 	}
 
-	assert((uint32_t)s->bitmap_size > (0x1000 + DEFAULT_KAFL_IJON_BITMAP_SIZE));
-	assert((((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) & (((uint32_t)s->bitmap_size-DEFAULT_KAFL_IJON_BITMAP_SIZE) - 1)) == 0 );
+	uint32_t main_size = s->bitmap_size - DEFAULT_KAFL_IJON_BITMAP_SIZE;
+	assert(main_size >= 0x1000);
+	assert((main_size & (main_size -1)) == 0);
 
 	if(s->worker_id == 0xFFFF){
 		fprintf(stderr, "[QEMU-Nyx] Error: Invalid worker id...\n");

@@ -42,6 +42,9 @@ if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
   cd ..
 fi
 
+# override default IJON bitmap size, or 0 to disable
+export QEMU_CFLAGS="-DDEFAULT_KAFL_IJON_BITMAP_SIZE=0"
+
 ./configure --target-list=x86_64-softmmu --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
 #--enable-sanitizers
 
