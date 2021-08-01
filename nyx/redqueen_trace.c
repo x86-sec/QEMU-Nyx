@@ -6,10 +6,7 @@
 
 void alt_bitmap_add(uint64_t from, uint64_t to);
 
-/* write full trace of edge transitions rather than sorted list? */
-//#define KAFL_FULL_TRACES
-
-#ifdef KAFL_FULL_TRACES
+#ifdef CONFIG_KAFL_FULL_TRACES
 #include "redqueen.h"
 extern int trace_fd;
 #endif
@@ -42,8 +39,7 @@ void redqueen_trace_register_transition(redqueen_trace_t* self, uint64_t from, u
 
 	if (from != exit_ip && to != exit_ip)
 		alt_bitmap_add(from, to);
-#ifdef KAFL_FULL_TRACES
-	extern int trace_fd;
+#ifdef CONFIG_KAFL_FULL_TRACES
 	if (!trace_fd)
 		trace_fd = open(redqueen_workdir.pt_trace_results, O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
 	dprintf(trace_fd, "%lx,%lx\n", from, to);
@@ -63,7 +59,7 @@ void redqueen_trace_register_transition(redqueen_trace_t* self, uint64_t from, u
 }	
 
 void redqueen_trace_write_file(redqueen_trace_t* self, int fd){
-#ifdef KAFL_FULL_TRACES
+#ifdef CONFIG_KAFL_FULL_TRACES
 	return;
 #endif
 	for(size_t i = 0; i < self->num_ordered_transitions; i++){

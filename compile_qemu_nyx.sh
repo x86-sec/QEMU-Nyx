@@ -42,15 +42,31 @@ if [ ! -f "/usr/lib/libxdc.so" ] || [ ! -f "/usr/include/libxdc.h" ]; then
   cd ..
 fi
 
-# override default IJON bitmap size, or 0 to disable
-export QEMU_CFLAGS="-DDEFAULT_KAFL_IJON_BITMAP_SIZE=0"
+# set IJON bitmap size (0 to disable)
+export QEMU_CFLAGS="-DCONFIG_KAFL_IJON_BITMAP_SIZE=0"
 
-./configure --target-list=x86_64-softmmu --enable-gtk --disable-werror --disable-capstone --disable-libssh --enable-nyx --disable-tools
+## dump edge trace as encountered during execution, do not sort/count (large traces)
+#export QEMU_CFLAGS="$QEMU_CFLAGS -DCONFIG_KAFL_FULL_TRACES"
+
+## register KVM_EXIT_SHUTDOWN as panic (e.g. triple-fault)
+export QEMU_CFLAGS="$QEMU_CFLAGS -DCONFIG_KVM_EXIT_SHUTDOWN_IS_PANIC"
+
+## register unknown KVM error as panic (don't)
+#export QEMU_CFLAGS="$QEMU_CFLAGS -DCONFIG_UNKNOWN_ERROR_IS_PANIC
+
+./configure \
+	--target-list=x86_64-softmmu \
+	--enable-gtk \
+	--disable-capstone \
+	--disable-libssh \
+	--disable-tools \
+	--disable-werror \
+	--enable-nyx
 #--enable-sanitizers
 
 if [ -f GNUmakefile ]; then
   rm GNUmakefile 2> /dev/null
 fi
 
-make -j
+make -j `nproc`
 

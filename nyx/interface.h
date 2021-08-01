@@ -23,7 +23,9 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define INTERFACE_H
 
 /* 64k bitmap + 4k ijon buffer */
-#ifndef DEFAULT_KAFL_IJON_BITMAP_SIZE
+#ifdef CONFIG_KAFL_IJON_BITMAP_SIZE
+#define DEFAULT_KAFL_IJON_BITMAP_SIZE CONFIG_KAFL_IJON_BITMAP_SIZE
+#else
 #define DEFAULT_KAFL_IJON_BITMAP_SIZE 0x1000
 #endif
 #define DEFAULT_KAFL_BITMAP_SIZE	0x10000 + DEFAULT_KAFL_IJON_BITMAP_SIZE
