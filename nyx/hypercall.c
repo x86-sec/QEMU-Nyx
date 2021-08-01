@@ -153,6 +153,8 @@ bool handle_hypercall_kafl_next_payload(struct kvm_run *run, CPUState *cpu, uint
 				qemu_mutex_unlock_iothread();
 				*/
 				GET_GLOBAL_STATE()->in_fuzzing_mode = true;
+				// does this help with TIMEOUT on first execution?
+				reset_timeout_detector(&GET_GLOBAL_STATE()->timeout_detector);
 				set_state_auxiliary_result_buffer(GET_GLOBAL_STATE()->auxilary_buffer, 3);
 
 				//sigprof_enabled = true;
