@@ -367,8 +367,8 @@ page_cache_t* page_cache_new(const char* cache_file, uint8_t disassembler_word_w
 
 
 	self->lookup = kh_init(PC_CACHE);
-	self->fd_page_file = open(tmp1, O_CLOEXEC | O_CREAT | O_RDWR, S_IRWXU, 0644);
-	self->fd_address_file = open(tmp2, O_CLOEXEC | O_CREAT | O_RDWR, S_IRWXU, 0644);
+	self->fd_page_file = open(tmp1, O_CLOEXEC | O_CREAT | O_RDWR, 0644);
+	self->fd_address_file = open(tmp2, O_CLOEXEC | O_CREAT | O_RDWR, 0644);
 
 #ifndef STANDALONE_DECODER
 	self->cpu = cpu;
