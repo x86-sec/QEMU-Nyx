@@ -151,24 +151,33 @@ static int kafl_guest_create_memory_bar(nyx_interface_state *s, int region_num, 
 	struct stat st;
 	
 	fd = open(file, O_CREAT|O_RDWR, S_IRWXU|S_IRWXG|S_IRWXO);
-	assert(ftruncate(fd, bar_size) == 0);
+	//assert(ftruncate(fd, bar_size) == 0);
 	stat(file, &st);
-	QEMU_PT_PRINTF(INTERFACE_PREFIX, "new shm file: (max size: %lx) %lx", bar_size, st.st_size);
-	
-	assert(bar_size == st.st_size);
-	ptr = mmap(0, bar_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
-	if (ptr == MAP_FAILED) {
-		error_setg_errno(errp, errno, "Failed to mmap memory");
-		return -1;
-	}
 
 	switch(region_num){
-		case 1:	pt_setup_program((void*)ptr);
-				break;
+		case 1:
+			assert(false); // dead code, PROGRAM buffer is deprecated in favor of sharedir
+			QEMU_PT_PRINTF(INTERFACE_PREFIX, "got program shm: (max size: %lx) %lx", bar_size, st.st_size);
+			assert(bar_size == st.st_size);
+			ptr = mmap(0, bar_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+			if (ptr == MAP_FAILED) {
+				error_setg_errno(errp, errno, "Failed to mmap memory");
+				return -1;
+			}
+			pt_setup_program((void*)ptr);
+			break;
 		case 2:	
+			QEMU_PT_PRINTF(INTERFACE_PREFIX, "got payload shm: (max size: %lx) %lx", bar_size, st.st_size);
+			//assert(bar_size == st.st_size);
+			ptr = mmap(0, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+			if (ptr == MAP_FAILED) {
+				error_setg_errno(errp, errno, "Failed to mmap memory");
+				return -1;
+			}
 				GET_GLOBAL_STATE()->shared_payload_buffer_fd = fd;
-				GET_GLOBAL_STATE()->shared_payload_buffer_size = bar_size;
+				GET_GLOBAL_STATE()->shared_payload_buffer_size = st.st_size;
 				break;
 	}
 
@@ -226,7 +235,7 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 		return false;
 	}
 	else {
-		kafl_guest_create_memory_bar(s, 2, PAYLOAD_SIZE, tmp, errp);
+		kafl_guest_create_memory_bar(s, 2, 0, tmp, errp);
 	}
 	free(tmp);
 
