@@ -206,8 +206,14 @@ static void opcode_analyzer(redqueen_t* self, cs_insn *ins){
 }
 
 void redqueen_callback(void* opaque, disassembler_mode_t mode, uint64_t start_addr, uint64_t end_addr){
-  GET_GLOBAL_STATE()->bb_coverage++;
+  uint64_t exit_ip = 0xffffffffffffffff;
   redqueen_t* self = (redqueen_t*) opaque;
+
+  if (start_addr != end_addr && start_addr != exit_ip && end_addr != exit_ip) {
+	  // count new BBs reported by libxdc, ignoring potential
+	  // 'fake' BB ranges due to VM/region entry/exit
+	  GET_GLOBAL_STATE()->bb_coverage++;
+  }
 
   if(start_addr != end_addr){
     uint64_t failed_page = 0;
