@@ -49,6 +49,7 @@ struct state_qemu_pt{
     bool nyx_fdl;
 
     char* workdir_path;
+    uint32_t worker_id;
 
     /* FAST VM RELOAD */
     bool fast_reload_enabled;
