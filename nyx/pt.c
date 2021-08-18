@@ -328,7 +328,7 @@ void pt_init_decoder(CPUState *cpu){
 	assert(GET_GLOBAL_STATE()->shared_bitmap_size != 0);
 	GET_GLOBAL_STATE()->decoder = libxdc_init(filters, (void* (*)(void*, uint64_t, bool*))page_cache_fetch2, GET_GLOBAL_STATE()->page_cache, GET_GLOBAL_STATE()->shared_bitmap_ptr, GET_GLOBAL_STATE()->shared_bitmap_size);
 
-	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
+	libxdc_register_bb_callback(GET_GLOBAL_STATE()->decoder, (void (*)(void*, disassembler_mode_t, uint64_t, uint64_t))redqueen_callback, GET_GLOBAL_STATE()->redqueen_state);
 	
 	alt_bitmap_init(
 			GET_GLOBAL_STATE()->shared_bitmap_ptr,
