@@ -9,6 +9,7 @@ page_cache.o \
 kvm_nested.o \
 state.o \
 debug.o \
+trace_dump.o \
 auxiliary_buffer.o \
 mmh3.o \
 nested_hypercalls.o \
