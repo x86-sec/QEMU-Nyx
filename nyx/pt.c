@@ -173,7 +173,7 @@ void alt_bitmap_add(uint64_t from, uint64_t to)
 {
 	uint64_t transition_value;
 
-	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
+	if (GET_GLOBAL_STATE()->trace_mode) {
 		if(alt_bitmap) {
 			transition_value = mix_bits(to)^(mix_bits(from)>>1);
 			alt_bitmap[transition_value & (alt_bitmap_size-1)]++;
@@ -243,8 +243,8 @@ int pt_enable(CPUState *cpu, bool hmp_mode){
 	if(!fast_reload_set_bitmap(get_fast_reload_snapshot())){
 		fuzz_bitmap_reset();
 	}
-	if (GET_GLOBAL_STATE()->redqueen_state->trace_mode) {
-		delete_trace_files();
+	if (GET_GLOBAL_STATE()->trace_mode) {
+		redqueen_trace_reset();
 		alt_bitmap_reset();
 	}
 	pt_truncate_pt_dump_file();

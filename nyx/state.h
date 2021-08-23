@@ -127,7 +127,8 @@ struct state_qemu_pt{
 
     bool in_fuzzing_mode;
     bool in_reload_mode; 
-     bool starved;
+    bool starved;
+    bool trace_mode;
 
     bool shutdown_requested;
     bool cow_cache_full;
