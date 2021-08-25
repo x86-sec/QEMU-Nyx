@@ -91,6 +91,7 @@ typedef struct nyx_interface_state {
 	bool debug_mode; 	/* support for hprintf */
 	bool notifier;
 	bool dump_pt_trace;
+	bool edge_cb_trace;
 
 	bool redqueen;
 	
@@ -272,6 +273,10 @@ static bool verify_workdir_state(nyx_interface_state *s, Error **errp){
 	// tmp never freed
   }
 
+  if(s->edge_cb_trace){
+	redqueen_trace_init();
+  }
+
 
 	assert(asprintf(&tmp, "%s/aux_buffer_%d", workdir, id) != -1);
 	/*
@@ -428,6 +433,7 @@ static Property kafl_guest_properties[] = {
 	DEFINE_PROP_BOOL("debug_mode", nyx_interface_state, debug_mode, false),
 	DEFINE_PROP_BOOL("crash_notifier", nyx_interface_state, notifier, true),
 	DEFINE_PROP_BOOL("dump_pt_trace", nyx_interface_state, dump_pt_trace, false),
+	DEFINE_PROP_BOOL("edge_cb_trace", nyx_interface_state, edge_cb_trace, false),
 
 
 	DEFINE_PROP_END_OF_LIST(),
