@@ -413,7 +413,7 @@ static void add_mblock(state_reallocation_t* self, char* foo, const char* bar, s
 static inline int get_handler(state_reallocation_t* self, QEMUFile* f, void* curr_elem, size_t size, VMStateField *field, char* vmsd_name){
 
     int ret;
-    //printf("%s\n", vmsd_name);
+    //fprintf(stderr, "devices get_handler: %s\n", vmsd_name);
 
     ret = field->info->get(f, curr_elem, size, field);
 

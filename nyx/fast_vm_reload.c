@@ -331,8 +331,6 @@ inline static void wait_for_snapshot(const char* folder){
 
 void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder){
 
-    //printf("================ %s => %s =============\n", __func__, folder);
-
     /* sanity check */
     if(!folder_exits(folder)){
         QEMU_PT_PRINTF(RELOAD_PREFIX,"Folder %s does not exist...failed!", folder);
@@ -340,11 +338,13 @@ void fast_reload_serialize_to_file(fast_reload_t* self, const char* folder){
     }
 
     if (!lock_snapshot(folder)) {
-        debug_printf("================ Refuse to overwrite at %s! ======\n", folder);
+        fprintf(stderr, "================ Waiting for snapshot at %s ======\n", folder);
 		// wait here for the peer to complete rather than *every* reload
 		wait_for_snapshot(folder);
 		return;
 	}
+
+    fprintf(stderr, "================ %s => %s =============\n", __func__, folder);
 
     /* shadow memory state */
     shadow_memory_serialize(self->shadow_memory_state, folder);
