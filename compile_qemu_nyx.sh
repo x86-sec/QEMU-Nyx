@@ -62,7 +62,7 @@ export QEMU_CFLAGS="$QEMU_CFLAGS -DCONFIG_KVM_EXIT_SHUTDOWN_IS_PANIC"
 	--disable-tools \
 	--disable-werror \
 	--enable-nyx
-#--enable-sanitizers
+#--enable-sanitizers --enable-debug-info
 
 if [ -f GNUmakefile ]; then
   rm GNUmakefile 2> /dev/null
