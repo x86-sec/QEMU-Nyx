@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "state.h"
+#include "state/state.h"
 #include "trace_dump.h"
 
 /* dump PT trace as returned from HW */
