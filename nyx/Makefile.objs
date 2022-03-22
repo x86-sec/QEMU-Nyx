@@ -1,5 +1,6 @@
 obj-y += \
 memory_access.o \
+memory_debug.o \
 interface.o \
 fast_vm_reload.o \
 fast_vm_reload_sync.o \
