@@ -5,6 +5,7 @@
 #include "exec/ram_addr.h"
 #include "qemu/rcu_queue.h"
 #include "nyx/state/state.h"
+#include "nyx/memory_debug.h"
 #include "sysemu/kvm.h"
 #include "pt.h"
 
@@ -219,7 +220,7 @@ static void write_address(uint64_t address, uint64_t size, uint64_t prot){
 	
 }
 
-void print_48_paging(uint64_t cr3){
+void print_48_paging(CPUState *cpu, uint64_t cr3){
     uint64_t paging_entries_level_1[PENTRIES];
     uint64_t paging_entries_level_2[PENTRIES];
     uint64_t paging_entries_level_3[PENTRIES];
@@ -228,7 +229,7 @@ void print_48_paging(uint64_t cr3){
     uint64_t address_identifier_1, address_identifier_2, address_identifier_3, address_identifier_4;
     uint32_t i1, i2, i3,i4;
 
-    cpu_physical_memory_rw((cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_level_1, PPAGE_SIZE, false);
+    memory_debug_physical_memory_rw(cpu, (cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_level_1, PPAGE_SIZE, false);
     for(i1 = 0; i1 < 512; i1++){
         if(paging_entries_level_1[i1]){
             address_identifier_1 = ((uint64_t)i1) << PLEVEL_1_SHIFT;
@@ -236,7 +237,7 @@ void print_48_paging(uint64_t cr3){
                 address_identifier_1 |= SIGN_EXTEND;
             }
             if(CHECK_BIT(paging_entries_level_1[i1], 0)){ /* otherwise swapped out */ 
-                cpu_physical_memory_rw((paging_entries_level_1[i1]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_2, PPAGE_SIZE, false);
+                memory_debug_physical_memory_rw(cpu, (paging_entries_level_1[i1]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_2, PPAGE_SIZE, false);
                 for(i2 = 0; i2 < PENTRIES; i2++){
                     if(paging_entries_level_2[i2]){
                         address_identifier_2 = (((uint64_t)i2) << PLEVEL_2_SHIFT) + address_identifier_1;
@@ -251,7 +252,7 @@ void print_48_paging(uint64_t cr3){
                             }
                             else{
                                 /* otherwise this PDPE references a 1GB page */
-                                cpu_physical_memory_rw((paging_entries_level_2[i2]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_3, PPAGE_SIZE, false);
+                                memory_debug_physical_memory_rw(cpu, (paging_entries_level_2[i2]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_3, PPAGE_SIZE, false);
 								for(i3 = 0; i3 < PENTRIES; i3++){
 									if(paging_entries_level_3[i3]){
 									    address_identifier_3 = (((uint64_t)i3) << PLEVEL_3_SHIFT) + address_identifier_2;
@@ -260,7 +261,7 @@ void print_48_paging(uint64_t cr3){
 									        	write_address(address_identifier_3, 0x200000, (uint64_t)paging_entries_level_3[i3] & ((1ULL<<63) | (1ULL<<2) | (1ULL<<1)));
 									        }
 									        else{
-												cpu_physical_memory_rw((paging_entries_level_3[i3]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_4, PPAGE_SIZE, false);
+                        memory_debug_physical_memory_rw(cpu, (paging_entries_level_3[i3]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_4, PPAGE_SIZE, false);
 											    for(i4 = 0; i4 < PENTRIES; i4++){
 											        if(paging_entries_level_4[i4]){
 											            address_identifier_4 = (((uint64_t)i4) << PLEVEL_4_SHIFT) + address_identifier_3;
@@ -388,11 +389,11 @@ void kvm_nested_get_info(CPUState *cpu){
 	                //mem_info_la57(mon, env);
 	            } else {
 	            	QEMU_PT_PRINTF(NESTED_VM_PREFIX, " ==== L1 Page Tables ====");
-	            	print_48_paging(saved_vmcs->host_cr3);
+	            	print_48_paging(cpu, saved_vmcs->host_cr3);
 
 	            	if(saved_vmcs->ept_pointer){
 		            	QEMU_PT_PRINTF(NESTED_VM_PREFIX, " ==== L2 Page Tables ====");
-		            	print_48_paging(saved_vmcs->ept_pointer);
+		            	print_48_paging(cpu, saved_vmcs->ept_pointer);
 		            }
 	                //mem_info_la48(mon, env);
 	            }

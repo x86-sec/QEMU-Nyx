@@ -33,10 +33,12 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include "nyx/state/state.h"
 #include "sysemu/kvm.h"
 #include "nyx/helpers.h"
+#include "nyx/memory_debug.h"
 
 #define INVALID_ADDRESS 0xFFFFFFFFFFFFFFFFULL
 
-static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot);
+static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr,
+    bool read_from_snapshot, CPUState *cpu);
 
 #define x86_64_PAGE_SIZE        0x1000
 #define x86_64_PAGE_MASK        ~(x86_64_PAGE_SIZE - 1)
@@ -91,7 +93,7 @@ uint64_t get_paging_phys_addr(CPUState *cpu, uint64_t cr3, uint64_t addr){
             fprintf(stderr, "mem_mode: mm_32_pae not implemented!\n");
             abort();
         case mm_64_l4_paging:
-            return get_48_paging_phys_addr(cr3, addr, false);
+            return get_48_paging_phys_addr(cr3, addr, false, cpu);
         case mm_64_l5_paging:
             fprintf(stderr, "mem_mode: mm_64_l5_paging not implemented!\n");
             abort();
@@ -117,7 +119,7 @@ static uint64_t get_paging_phys_addr_snapshot(CPUState *cpu, uint64_t cr3, uint6
             fprintf(stderr, "mem_mode: mm_32_pae not implemented!\n");
             abort();
         case mm_64_l4_paging:
-            return get_48_paging_phys_addr(cr3, addr, true);
+            return get_48_paging_phys_addr(cr3, addr, true, cpu);
         case mm_64_l5_paging:
             fprintf(stderr, "mem_mode: mm_64_l5_paging not implemented!\n");
             abort();
@@ -130,13 +132,13 @@ static uint64_t get_paging_phys_addr_snapshot(CPUState *cpu, uint64_t cr3, uint6
 
 bool read_physical_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu){
     kvm_arch_get_registers(cpu);
-    cpu_physical_memory_read(address, data, size);
+    memory_debug_physical_memory_rw(cpu, address, data, size, 0);
     return true;
 }
 
 bool write_physical_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu){
     kvm_arch_get_registers(cpu);
-    cpu_physical_memory_write(address, data, size);
+    memory_debug_physical_memory_rw(cpu, address, data, size, 1);
     return true;
 }
 
@@ -618,7 +620,7 @@ static void write_address(uint64_t address, uint64_t size, uint64_t prot){
     
 }
 
-void print_48_paging2(uint64_t cr3){
+void print_48_paging2(CPUState *cpu, uint64_t cr3){
     uint64_t paging_entries_level_1[PENTRIES];
     uint64_t paging_entries_level_2[PENTRIES];
     uint64_t paging_entries_level_3[PENTRIES];
@@ -627,7 +629,7 @@ void print_48_paging2(uint64_t cr3){
     uint64_t address_identifier_1, address_identifier_2, address_identifier_3, address_identifier_4;
     uint32_t i1, i2, i3,i4;
 
-    cpu_physical_memory_rw((cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_level_1, PPAGE_SIZE, false);
+    memory_debug_physical_memory_rw(cpu, (cr3&PAGETABLE_MASK), (uint8_t *) paging_entries_level_1, PPAGE_SIZE, false);
     for(i1 = 0; i1 < 512; i1++){
         if(paging_entries_level_1[i1]){
             address_identifier_1 = ((uint64_t)i1) << PLEVEL_1_SHIFT;
@@ -635,7 +637,7 @@ void print_48_paging2(uint64_t cr3){
                 address_identifier_1 |= SIGN_EXTEND;
             }
             if(CHECK_BIT(paging_entries_level_1[i1], 0)){ /* otherwise swapped out */ 
-                cpu_physical_memory_rw((paging_entries_level_1[i1]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_2, PPAGE_SIZE, false);
+                memory_debug_physical_memory_rw(cpu, (paging_entries_level_1[i1]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_2, PPAGE_SIZE, false);
                 for(i2 = 0; i2 < PENTRIES; i2++){
                     if(paging_entries_level_2[i2]){
                         address_identifier_2 = (((uint64_t)i2) << PLEVEL_2_SHIFT) + address_identifier_1;
@@ -650,7 +652,7 @@ void print_48_paging2(uint64_t cr3){
                             }
                             else{
                                 /* otherwise this PDPE references a 1GB page */
-                                cpu_physical_memory_rw((paging_entries_level_2[i2]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_3, PPAGE_SIZE, false);
+                                memory_debug_physical_memory_rw(cpu, (paging_entries_level_2[i2]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_3, PPAGE_SIZE, false);
                                 for(i3 = 0; i3 < PENTRIES; i3++){
                                     if(paging_entries_level_3[i3]){
                                         address_identifier_3 = (((uint64_t)i3) << PLEVEL_3_SHIFT) + address_identifier_2;
@@ -659,7 +661,7 @@ void print_48_paging2(uint64_t cr3){
                                                 write_address(address_identifier_3, 0x200000, (uint64_t)paging_entries_level_3[i3] & ((1ULL<<63) | (1ULL<<2) | (1ULL<<1)));
                                             }
                                             else{
-                                                cpu_physical_memory_rw((paging_entries_level_3[i3]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_4, PPAGE_SIZE, false);
+                                                memory_debug_physical_memory_rw(cpu, (paging_entries_level_3[i3]&PAGETABLE_MASK), (uint8_t *) paging_entries_level_4, PPAGE_SIZE, false);
                                                 for(i4 = 0; i4 < PENTRIES; i4++){
                                                     if(paging_entries_level_4[i4]){
                                                         address_identifier_4 = (((uint64_t)i4) << PLEVEL_4_SHIFT) + address_identifier_3;
@@ -684,7 +686,7 @@ void print_48_paging2(uint64_t cr3){
 }
 
 
-static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot, bool *success){
+static uint64_t* load_page_table(CPUState *cpu, uint64_t page_table_address, uint64_t* paging_entries_buffer, uint8_t level, bool read_from_snapshot, bool *success){
     if(page_table_address == INVALID_ADDRESS){
         *success = false;
     }
@@ -693,13 +695,14 @@ static uint64_t* load_page_table(uint64_t page_table_address, uint64_t* paging_e
         *success = read_snapshot_memory(get_fast_reload_snapshot(), page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE);   
     }
     else{
-        cpu_physical_memory_rw(page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
+        memory_debug_physical_memory_rw(cpu, page_table_address, (uint8_t *) paging_entries_buffer, PPAGE_SIZE, false);
         *success = true; /* fix this */
     }
     return paging_entries_buffer;
 }
 
-static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_from_snapshot){
+static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr,
+    bool read_from_snapshot, CPUState *cpu){
     /* signedness broken af -> fix me! */
     uint16_t pml_4_index = (addr & 0xFF8000000000ULL) >> 39;
     uint16_t pml_3_index = (addr & 0x0007FC0000000UL) >> 30;
@@ -714,7 +717,7 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
     bool success = false;
 
     page_table_address = (cr3&PAGETABLE_MASK);
-    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 0, read_from_snapshot, &success);
+    paging_entries_buffer_ptr = load_page_table(cpu, page_table_address, paging_entries_buffer, 0, read_from_snapshot, &success);
 
     if (unlikely(success == false)){
         goto fail;
@@ -728,7 +731,7 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
         if(CHECK_BIT(paging_entries_buffer_ptr[pml_4_index], 0)){ /* otherwise swapped out */ 
 
             page_table_address = (paging_entries_buffer_ptr[pml_4_index]&PAGETABLE_MASK);
-            paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 1, read_from_snapshot, &success);
+            paging_entries_buffer_ptr = load_page_table(cpu, page_table_address, paging_entries_buffer, 1, read_from_snapshot, &success);
 
             if (unlikely(success == false)){
                 goto fail;
@@ -745,7 +748,7 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
                     else{
 
                         page_table_address = (paging_entries_buffer_ptr[pml_3_index]&PAGETABLE_MASK);
-                        paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 2, read_from_snapshot, &success);
+                        paging_entries_buffer_ptr = load_page_table(cpu, page_table_address, paging_entries_buffer, 2, read_from_snapshot, &success);
 
                         if (unlikely(success == false)){
                             goto fail;
@@ -760,7 +763,7 @@ static uint64_t get_48_paging_phys_addr(uint64_t cr3, uint64_t addr, bool read_f
                                 else{
 
                                     page_table_address = (paging_entries_buffer_ptr[pml_2_index]&PAGETABLE_MASK);
-                                    paging_entries_buffer_ptr = load_page_table(page_table_address, paging_entries_buffer, 3, read_from_snapshot, &success);
+                                    paging_entries_buffer_ptr = load_page_table(cpu, page_table_address, paging_entries_buffer, 3, read_from_snapshot, &success);
 
                                     if (unlikely(success == false)){
                                          goto fail;
@@ -792,7 +795,6 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
     uint8_t tmp_buf[x86_64_PAGE_SIZE];
     //MemTxAttrs attrs;
     hwaddr phys_addr;
-    int asidx;
     
     uint64_t amount_copied = 0;
     
@@ -805,7 +807,6 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
         if(len_to_copy > x86_64_PAGE_SIZE)
             len_to_copy = x86_64_PAGE_SIZE;
 
-        asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
         //MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
 #ifdef DEBUG_48BIT_WALK
         phys_addr_2 = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
@@ -838,7 +839,7 @@ bool read_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUStat
             len_to_copy = remaining_on_page;
         }
 
-        MemTxResult txt = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, tmp_buf, len_to_copy, 0);
+        MemTxResult txt = memory_debug_physical_memory_rw(cpu, phys_addr, tmp_buf, len_to_copy, 0);
         if(txt){
             QEMU_PT_PRINTF(MEM_PREFIX, "Warning, read failed:\t%lx (%lx)", address, phys_addr);
         }
@@ -880,8 +881,7 @@ bool dump_page_cr3_snapshot(uint64_t address, uint8_t* data, CPUState *cpu, uint
 
 bool dump_page_cr3_ht(uint64_t address, uint8_t* data, CPUState *cpu, uint64_t cr3){
     hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, cr3, address);
-    int asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-    if(phys_addr == INVALID_ADDRESS || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
+    if(phys_addr == INVALID_ADDRESS || memory_debug_physical_memory_rw(cpu, phys_addr, data, 0x1000, 0)){
         if(phys_addr != INVALID_ADDRESS){
             fprintf(stderr, "%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
         }
@@ -894,9 +894,8 @@ bool dump_page_ht(uint64_t address, uint8_t* data, CPUState *cpu){
     CPUX86State *env = &(X86_CPU(cpu))->env;
     kvm_arch_get_registers_fast(cpu);
     hwaddr phys_addr = (hwaddr) get_paging_phys_addr(cpu, env->cr[3], address);
-    int asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-    if(phys_addr == 0xffffffffffffffffULL || address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, 0x1000, 0)){
-        if(phys_addr != 0xffffffffffffffffULL){
+    if(phys_addr == INVALID_ADDRESS || memory_debug_physical_memory_rw(cpu, phys_addr, data, 0x1000, 0)){
+        if(phys_addr != INVALID_ADDRESS){
             fprintf(stderr, "%s: Warning, read failed:\t%lx (%lx)\n", __func__, address, phys_addr);
         }
     }
