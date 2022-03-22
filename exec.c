@@ -3796,12 +3796,15 @@ address_space_write_cached_slow(MemoryRegionCache *cache, hwaddr addr,
 #define RCU_READ_UNLOCK()        ((void)0)
 #include "memory_ldst.inc.c"
 
+#include "nyx/memory_debug.h"
+
 /* virtual memory access for debug (includes writing to ROM) */
 int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
                         uint8_t *buf, target_ulong len, int is_write)
 {
     hwaddr phys_addr;
     target_ulong l, page;
+    AddressSpace *as = NULL;
 
     cpu_synchronize_state(cpu);
     while (len > 0) {
@@ -3809,8 +3812,23 @@ int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
         MemTxAttrs attrs;
 
         page = addr & TARGET_PAGE_MASK;
-        phys_addr = cpu_get_phys_page_attrs_debug(cpu, page, &attrs);
-        asidx = cpu_asidx_from_attrs(cpu, attrs);
+        // XXX
+        // This check is breaking non X86 cpus..
+        // Lets consider that when cpu is in smm memory accesses are within
+        // KVM-SMRAM
+        if (is_smm(cpu) && kvm_enabled()) {
+            as = get_address_space(cpu, "KVM-SMRAM");
+            if (!as) {
+              return -1;
+            }
+            phys_addr = x86_cpu_get_phys_page_attrs_as(cpu, page, &attrs, as);
+        } else {
+            phys_addr = cpu_get_phys_page_attrs_debug(cpu, page, &attrs);
+            asidx = cpu_asidx_from_attrs(cpu, attrs);
+            as = cpu->cpu_ases[asidx].as;
+        }
+
+
         /* if no physical page mapped, return an error */
         if (phys_addr == -1)
             return -1;
@@ -3819,11 +3837,9 @@ int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
             l = len;
         phys_addr += (addr & ~TARGET_PAGE_MASK);
         if (is_write) {
-            address_space_write_rom(cpu->cpu_ases[asidx].as, phys_addr,
-                                    attrs, buf, l);
+            address_space_write_rom(as, phys_addr, attrs, buf, l);
         } else {
-            address_space_rw(cpu->cpu_ases[asidx].as, phys_addr,
-                             attrs, buf, l, 0);
+            address_space_rw(as, phys_addr, attrs, buf, l, 0);
         }
         len -= l;
         buf += l;
