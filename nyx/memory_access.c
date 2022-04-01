@@ -338,8 +338,6 @@ bool remap_payload_buffer(uint64_t virt_guest_addr, CPUState *cpu){
 bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUState *cpu)
 {
     /* Todo: later &address_space_memory + phys_addr -> mmap SHARED */
-    int asidx;
-    MemTxAttrs attrs;
     hwaddr phys_addr;
     MemTxResult res;
 
@@ -353,17 +351,18 @@ bool write_virtual_memory(uint64_t address, uint8_t* data, uint32_t size, CPUSta
 
         refresh_kvm(cpu);
         //cpu_synchronize_state(cpu);
-        asidx = cpu_asidx_from_attrs(cpu, MEMTXATTRS_UNSPECIFIED);
-        attrs = MEMTXATTRS_UNSPECIFIED;
-        phys_addr = cpu_get_phys_page_attrs_debug(cpu, (address & x86_64_PAGE_MASK), &attrs);
+
+        X86CPU *cpux86 = X86_CPU(cpu);
+        CPUX86State *env = &cpux86->env;
+        phys_addr = get_paging_phys_addr(cpu, env->cr[3], address);
 
         if (phys_addr == INVALID_ADDRESS){
             QEMU_PT_PRINTF(MEM_PREFIX, "phys_addr == -1:\t%lx", address);
             return false;
         }
-        
-        phys_addr += (address & ~x86_64_PAGE_MASK);   
-        res = address_space_rw(cpu_get_address_space(cpu, asidx), phys_addr, MEMTXATTRS_UNSPECIFIED, data, l, true);
+
+        res = memory_debug_physical_memory_rw(cpu, phys_addr, data, l, true);
+
         if (res != MEMTX_OK){
             QEMU_PT_PRINTF(MEM_PREFIX, "!MEMTX_OK:\t%lx", address);
             return false;
