@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "qemu/osdep.h"
+#include "qemu-common.h"
+#include "qemu/log.h"
+
 #define ENABLE_BACKTRACES
 
 #define QEMU_PT_PRINT_PREFIX  "[QEMU-PT]\t"
@@ -25,20 +29,28 @@
 #define COLOR	"\033[1;35m"
 #define ENDC	"\033[0m"
 
+#define NYX_DEBUG_ENABLE
+#ifdef NYX_DEBUG_ENABLE
 
-//#define debug_printf(format, ...) printf (format, ##__VA_ARGS__)
-//#define debug_fprintf(fd, format, ...) fprintf (fd, format, ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX COLOR PREFIX format ENDC "\n", ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
-//#define QEMU_PT_PRINTF_DEBUG(format, ...)  fprintf (stderr, QEMU_PT_PRINT_PREFIX DEBUG_VM_PREFIX "(%s#:%d)\t"format "\n", __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+#define debug_printf(format, ...) printf (format, ##__VA_ARGS__)
+#define debug_fprintf(fd, format, ...) fprintf (fd, format, ##__VA_ARGS__)
+#define QEMU_PT_PRINTF(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX COLOR PREFIX format ENDC "\n", ##__VA_ARGS__)
+#define QEMU_PT_PRINTF_DBG(PREFIX, format, ...) printf (QEMU_PT_PRINT_PREFIX PREFIX "(%s#:%d)\t"format, __BASE_FILE__, __LINE__, ##__VA_ARGS__)
+#define QEMU_PT_PRINTF_DEBUG(format, ...)  fprintf (stderr, QEMU_PT_PRINT_PREFIX DEBUG_VM_PREFIX "(%s#:%d)\t"format "\n", __BASE_FILE__, __LINE__, ##__VA_ARGS__)
 
-#define debug_printf(format, ...) 
-#define debug_fprintf(fd, format, ...) 
+#define QEMU_PT_TRACE(format, ...)  {qemu_log_mask(LOG_KAFL, QEMU_PT_PRINT_PREFIX "%s: " format, __func__, ##__VA_ARGS__);}
+
+#else
+
+#define debug_printf(format, ...)
+#define debug_fprintf(fd, format, ...)
 #define QEMU_PT_PRINTF(PREFIX, format, ...)
 #define QEMU_PT_PRINTF_DBG(PREFIX, format, ...)
-#define QEMU_PT_PRINTF_DEBUG(format, ...)  
+#define QEMU_PT_PRINTF_DEBUG(format, ...)
 
+#define QEMU_PT_TRACE(PREFIX, format, ...)
 
+#endif//NYX_DEBUG_ENABLE
 
 #ifdef ENABLE_BACKTRACES
 
