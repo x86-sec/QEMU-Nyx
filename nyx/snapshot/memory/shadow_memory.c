@@ -186,7 +186,7 @@ shadow_memory_t* shadow_memory_init_from_snapshot(const char* snapshot_folder, b
     fseek(file_mem_dump, 0L, SEEK_END);
     uint64_t file_mem_dump_size = ftell(file_mem_dump);
 
-    debug_fprintf(stderr, "guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, dump_file);
+    debug_fprintf(stderr, "guest_ram_size == ftell(f) => 0x%lx vs 0x%lx (%s)\n", self->memory_size, file_mem_dump_size, path_dump);
 
     #define VGA_SIZE (16<<20)
 
